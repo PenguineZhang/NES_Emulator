@@ -14,20 +14,18 @@ class PZ6502{
         ~PZ6502();
         void ConnectBus(Bus *n){ m_bus = n; }
 
-
-
         void clock();
         void reset();
         void irq();         // interrupt request
         void nmi();         // non-maskable interrupt
 
         uint8_t fetch();
-        uint8_t fetched = 0x00;
+        uint8_t m_fetched = 0x00;
 
-        uint16_t addr_abs = 0x0000;
-        uint16_t addr_rel = 0x00;
-        uint8_t opcode = 0x00;
-        uint8_t cycle = 0;
+        uint16_t m_addrAbs = 0x0000;
+        uint16_t m_addrRel = 0x00;
+        uint8_t m_opcode = 0x00;
+        uint8_t m_cycles = 0;
 
     public:
         enum FLAGS6502{
@@ -41,12 +39,12 @@ class PZ6502{
             N = (1 << 7),   // Negative
         };
 
-        uint8_t a = 0x00;       // Accumulator register
-        uint8_t x = 0x00;       // X register
-        uint8_t y = 0x00;       // Y register
-        uint8_t stkp = 0x00;    // Stack Pointer (points to location on bus)
-        uint16_t pc = 0x0000;   // Program counter
-        uint8_t status = 0x00;  // status register
+        uint8_t m_accum = 0x00;     // Accumulator register
+        uint8_t m_xReg = 0x00;      // X register
+        uint8_t m_yReg = 0x00;      // Y register
+        uint8_t m_stkp = 0x00;      // Stack Pointer (points to location on bus)
+        uint16_t m_pc = 0x0000;     // Program counter
+        uint8_t m_status = 0x00;    // status register
 
 
     private:
@@ -64,6 +62,7 @@ class PZ6502{
         uint8_t ZP0();      // zero page ""
         uint8_t ZPX();      // indexed Zero page (X)
         uint8_t ZPY();      // indexed Zero page (Y)
+        uint8_t REL();
         uint8_t ABS();      // absolute ""
         uint8_t ABX();      // indexed absolute "" (X)
         uint8_t ABY();      // indexed absolute "" (Y)
@@ -87,12 +86,15 @@ class PZ6502{
         uint8_t STX();	uint8_t STY();	uint8_t TAX();	uint8_t TAY();
         uint8_t TSX();	uint8_t TXA();	uint8_t TXS();	uint8_t TYA();
 
+        // invalid opcodes for this cpu
+        uint8_t XXX();
+
         struct INSTRUCTION{
             std::string name; //mnemonic
-            uint8_t     (PZ6502::*operate)(void) = nullptr;  // function pointer to opcode
-            uint8_t     (PZ6502::*addrmode)(void) = nullptr;    // function pointer to address mode
+            uint8_t     (PZ6502::*operate)() = nullptr;  // function pointer to opcode
+            uint8_t     (PZ6502::*addrmode)() = nullptr;    // function pointer to address mode
             uint8_t     cycle = 0;
         };
 
-        std::vector<INSTRUCTION> lookup;
+        std::vector<INSTRUCTION> m_lookup;
 };
