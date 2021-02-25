@@ -217,19 +217,6 @@ uint8_t PZ6502::fetch(){
     return m_fetched;
 }
 
-uint8_t PZ6502::ADC(){
-
-}
-
-uint8_t PZ6502::AND(){
-    fetch();
-    m_accum = m_accum & m_fetched;
-
-    SetFlag(FLAGS6502::Z, m_accum == 0x00);
-    SetFlag(FLAGS6502::N, m_accum & 0x80);
-
-    return 1;
-}
 
 uint8_t PZ6502::BCS(){
     if(GetFlag(FLAGS6502::C) == 1){
@@ -368,5 +355,83 @@ uint8_t PZ6502::CLC(){
 
 uint8_t PZ6502::CLD(){
     SetFlag(FLAGS6502::D, false);
+    return 0;
+}
+
+
+uint8_t PZ6502::AND(){
+    fetch();
+    m_accum = m_accum & m_fetched;
+
+    SetFlag(FLAGS6502::Z, m_accum == 0x00);
+    SetFlag(FLAGS6502::N, m_accum & 0x80);
+
+    return 1;
+}
+
+
+/**
+ * Truth table:
+ *  A - accumulator
+ *  M - fetched value
+ *  R - result
+ *  V - overflow bit
+ *
+ *  0 - positive
+ *  1 - negative
+ *
+ *  A  M  R  N   A^R  ~(A^M)
+ *  0  0  0  0    0      1
+ *  0  0  1  1    1      1
+ *  0  1  0  0    0      0
+ *  0  1  1  0    1      0
+ *  1  0  0  0    1      0         V = (A^R) & ~(A^M)
+ *  1  0  1  0    0      0
+ *  1  1  0  1    1      1
+ *  1  1  1  0    0      1
+ */
+uint8_t PZ6502::ADC(){
+    fetch();
+    uint16_t temp = (uint16_t)m_accum + (uint16_t)m_fetched + (uint16_t)GetFlag(C);
+    SetFlag(C, temp > 255);
+    SetFlag(Z, (temp & 0x00ff) == 0);
+    SetFlag(N, temp & 0x80);
+    SetFlag(V, ( ((uint16_t)m_accum ^ temp) & ~((uint16_t)m_accum ^ (uint16_t)m_fetched) ) );
+
+    m_accum = temp & 0x00ff;
+    return 1;
+}
+
+
+/**
+ * reference: https://www.masswerk.at/6502/6502_instruction_set.html#SBC
+ *
+ * Using 2's compliment
+ * A = A - M - (1-C)
+ *         _
+ * A = A + M + 1 - 1 + C
+ *         _
+ * A = A + M + C
+ */
+uint8_t PZ6502::SBC(){
+    fetch();
+
+    // invert the data
+    uint16_t inverted_M = ((uint16_t)m_fetched) ^ 0x00ff;
+
+    uint16_t temp = (uint16_t)m_accum + inverted_M + (uint16_t)GetFlag(C);
+    SetFlag(C, temp & 0xff00);
+    SetFlag(Z, (temp & 0x00ff) == 0);
+    SetFlag(N, temp & 0x80);
+    SetFlag(V, ( ((uint16_t)m_accum ^ temp) & ~((uint16_t)m_accum ^ inverted_M) ) );
+
+    m_accum = temp & 0x00ff;
+    return 1;
+}
+
+// push accumulator on stack
+uint8_t PZ6502::PHA(){
+    write(0x0100 + m_stkp, m_accum);
+    m_stkp--;
     return 0;
 }
