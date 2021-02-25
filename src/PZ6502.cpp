@@ -52,95 +52,95 @@ uint8_t PZ6502::GetFlag(FLAGS6502 f){
  */
 void PZ6502::SetFlag(FLAGS6502 f, bool v){
     if(v){
-        m_status |= f;
+        status |= f;
     }else{
-        m_status &= ~f;
+        status &= ~f;
     }
 }
 
 void PZ6502::clock(){
-    if(m_cycles == 0){
-        m_opcode = read(m_pc);
-        m_pc++;
+    if(cycles == 0){
+        opcode = read(pc);
+        pc++;
 
         // get starting number of cycles
-        m_cycles = m_lookup[m_opcode].cycle;
+        cycles = m_lookup[opcode].cycle;
 
         // fetch intermediate data
-        uint8_t additional_cycle1 = (this->*m_lookup[m_opcode].addrmode)();
+        uint8_t additional_cycle1 = (this->*m_lookup[opcode].addrmode)();
 
         // perform operation
-        uint8_t additional_cycle2 = (this->*m_lookup[m_opcode].operate)();
+        uint8_t additional_cycle2 = (this->*m_lookup[opcode].operate)();
 
-        m_cycles += (additional_cycle1 & additional_cycle2);
+        cycles += (additional_cycle1 & additional_cycle2);
     }
 
-    m_cycles--;
+    cycles--;
 }
 
 // addressing mode
 uint8_t PZ6502::IMP(){
-    m_fetched = m_accum;
+    fetched = accum;
     return 0;
 }
 
 uint8_t PZ6502::IMM(){
-    m_addrAbs = m_pc++;
+    addrAbs = pc++;
     return 0;
 }
 
 uint8_t PZ6502::ZP0(){
-    m_addrAbs = read(m_pc);
-    m_pc++;
-    m_addrAbs &= 0x00ff;
+    addrAbs = read(pc);
+    pc++;
+    addrAbs &= 0x00ff;
     return 0;
 }
 
 uint8_t PZ6502::ZPX(){
-    m_addrAbs = read(m_pc) + m_xReg;
-    m_pc++;
-    m_addrAbs &= 0x00ff;
+    addrAbs = read(pc) + x_reg;
+    pc++;
+    addrAbs &= 0x00ff;
     return 0;
 }
 
 uint8_t PZ6502::ZPY(){
-    m_addrAbs = read(m_pc) + m_yReg;
-    m_pc++;
-    m_addrAbs &= 0x00ff;
+    addrAbs = read(pc) + y_reg;
+    pc++;
+    addrAbs &= 0x00ff;
     return 0;
 }
 
 uint8_t PZ6502::REL(){
-    m_addrRel = read(m_pc);
-    m_pc++;
+    addrRel = read(pc);
+    pc++;
 
-    if(m_addrRel & 0x80){
-        m_addrRel |= 0xff00;
+    if(addrRel & 0x80){
+        addrRel |= 0xff00;
     }
 
     return 0;
 }
 
 uint8_t PZ6502::ABS(){
-    uint16_t lo = read(m_pc);
-    m_pc++;
-    uint16_t hi = read(m_pc);
-    m_pc++;
+    uint16_t lo = read(pc);
+    pc++;
+    uint16_t hi = read(pc);
+    pc++;
 
-    m_addrAbs = (hi << 8) | lo;
+    addrAbs = (hi << 8) | lo;
     return 0;
 }
 
 uint8_t PZ6502::ABX(){
-    uint16_t lo = read(m_pc);
-    m_pc++;
-    uint16_t hi = read(m_pc);
-    m_pc++;
+    uint16_t lo = read(pc);
+    pc++;
+    uint16_t hi = read(pc);
+    pc++;
 
-    m_addrAbs = (hi << 8) | lo;
-    m_addrAbs += m_xReg;
+    addrAbs = (hi << 8) | lo;
+    addrAbs += x_reg;
 
-    if((m_addrAbs & 0xff00) != (hi << 8)){
+    if((addrAbs & 0xff00) != (hi << 8)){
         return 1;
     }else{
         return 0;
@@ -148,15 +148,15 @@ uint8_t PZ6502::ABX(){
 }
 
 uint8_t PZ6502::ABY(){
-    uint16_t lo = read(m_pc);
-    m_pc++;
-    uint16_t hi = read(m_pc);
-    m_pc++;
+    uint16_t lo = read(pc);
+    pc++;
+    uint16_t hi = read(pc);
+    pc++;
 
-    m_addrAbs = (hi << 8) | lo;
-    m_addrAbs += m_yReg;
+    addrAbs = (hi << 8) | lo;
+    addrAbs += y_reg;
 
-    if((m_addrAbs & 0xff00) != (hi << 8)){
+    if((addrAbs & 0xff00) != (hi << 8)){
         return 1;
     }else{
         return 0;
@@ -164,45 +164,45 @@ uint8_t PZ6502::ABY(){
 }
 
 uint8_t PZ6502::IND(){
-    uint16_t ptr_lo = read(m_pc);
-    m_pc++;
-    uint16_t ptr_hi = read(m_pc);
-    m_pc++;
+    uint16_t ptr_lo = read(pc);
+    pc++;
+    uint16_t ptr_hi = read(pc);
+    pc++;
 
     uint16_t ptr = (ptr_hi << 8) | ptr_lo;
 
     if(ptr_lo == 0x00ff){
-        m_addrAbs = read((ptr & 0xff00) << 8) | read(ptr + 0);
+        addrAbs = read((ptr & 0xff00) << 8) | read(ptr + 0);
     }else{
-        m_addrAbs = (read(ptr + 1) << 8) | read(ptr + 0);
+        addrAbs = (read(ptr + 1) << 8) | read(ptr + 0);
     }
 
     return 0;
 }
 
 uint8_t PZ6502::IZX(){
-    uint16_t t = read(m_pc);
-    m_pc++;
+    uint16_t t = read(pc);
+    pc++;
 
-    uint16_t lo = read((uint16_t)(t + (uint16_t)m_xReg) & 0x00ff);
-    uint16_t hi = read((uint16_t)(t + (uint16_t)m_xReg + 1) & 0xff00);
+    uint16_t lo = read((uint16_t)(t + (uint16_t)x_reg) & 0x00ff);
+    uint16_t hi = read((uint16_t)(t + (uint16_t)x_reg + 1) & 0xff00);
 
-    m_addrAbs = (hi << 8) | lo;
+    addrAbs = (hi << 8) | lo;
 
     return 0;
 }
 
 uint8_t PZ6502::IZY(){
-    uint16_t t = read(m_pc);
-    m_pc++;
+    uint16_t t = read(pc);
+    pc++;
 
     uint16_t lo = read(t & 0x00ff);
     uint16_t hi = read((t + 1) & 0x00ff);
 
-    m_addrAbs = (hi << 8) | lo;
-    m_addrAbs += m_yReg;
+    addrAbs = (hi << 8) | lo;
+    addrAbs += y_reg;
 
-    if((m_addrAbs & 0xff00) != (hi << 8)){
+    if((addrAbs & 0xff00) != (hi << 8)){
         return 1;
     }else{
         return 0;
@@ -210,167 +210,21 @@ uint8_t PZ6502::IZY(){
 }
 
 uint8_t PZ6502::fetch(){
-    if(!(m_lookup[m_opcode].addrmode == &PZ6502::IMP)){
-        m_fetched = read(m_addrAbs);
+    if(!(m_lookup[opcode].addrmode == &PZ6502::IMP)){
+        fetched = read(addrAbs);
     }
 
-    return m_fetched;
+    return fetched;
 }
 
 
-uint8_t PZ6502::BCS(){
-    if(GetFlag(FLAGS6502::C) == 1){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-uint8_t PZ6502::BCC(){
-    if(GetFlag(FLAGS6502::C) == 0){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-uint8_t PZ6502::BEQ(){
-    if(GetFlag(FLAGS6502::Z) == 1){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-uint8_t PZ6502::BNE(){
-    if(GetFlag(FLAGS6502::Z) == 0){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-uint8_t PZ6502::BMI(){
-    if(GetFlag(FLAGS6502::N) == 1){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-
-uint8_t PZ6502::BPL(){
-    if(GetFlag(FLAGS6502::N) == 0){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-uint8_t PZ6502::BVC(){
-    if(GetFlag(FLAGS6502::V) == 1){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-uint8_t PZ6502::BVS(){
-    if(GetFlag(FLAGS6502::V) == 0){
-        m_cycles++;
-        m_addrAbs = m_pc + m_addrRel;
-
-        if((m_addrAbs & 0xff00) != (m_pc & 0xff00)){
-            m_cycles++;
-        }
-
-        m_pc = m_addrAbs;
-    }
-
-    return 0;
-}
-
-
-uint8_t PZ6502::CLC(){
-    SetFlag(FLAGS6502::C, false);
-    return 0;
-}
-
-
-uint8_t PZ6502::CLD(){
-    SetFlag(FLAGS6502::D, false);
-    return 0;
-}
-
-
-uint8_t PZ6502::AND(){
-    fetch();
-    m_accum = m_accum & m_fetched;
-
-    SetFlag(FLAGS6502::Z, m_accum == 0x00);
-    SetFlag(FLAGS6502::N, m_accum & 0x80);
-
-    return 1;
-}
-
+/****************************************************************************/
+/*                     Opcodes implementations                              */
 
 /**
+ * Add Memory to Accumulator with Carry
+ * A + M + C -> A, C
+ * 
  * Truth table:
  *  A - accumulator
  *  M - fetched value
@@ -392,15 +246,174 @@ uint8_t PZ6502::AND(){
  */
 uint8_t PZ6502::ADC(){
     fetch();
-    uint16_t temp = (uint16_t)m_accum + (uint16_t)m_fetched + (uint16_t)GetFlag(C);
+    uint16_t temp = (uint16_t)accum + (uint16_t)fetched + (uint16_t)GetFlag(C);
     SetFlag(C, temp > 255);
     SetFlag(Z, (temp & 0x00ff) == 0);
     SetFlag(N, temp & 0x80);
-    SetFlag(V, ( ((uint16_t)m_accum ^ temp) & ~((uint16_t)m_accum ^ (uint16_t)m_fetched) ) );
+    SetFlag(V, ( ((uint16_t)accum ^ temp) & ~((uint16_t)accum ^ (uint16_t)fetched) ) );
 
-    m_accum = temp & 0x00ff;
+    accum = temp & 0x00ff;
     return 1;
 }
+
+//AND Memory with Accumulator
+// A AND M -> A
+uint8_t PZ6502::AND(){
+    fetch();
+    accum = accum & fetched;
+
+    SetFlag(Z, accum == 0x00);
+    SetFlag(N, accum & 0x80);
+
+    return 1;
+}
+
+// Branch on Carry Set
+// branch on C = 1
+uint8_t PZ6502::BCS(){
+    if(GetFlag(C) == 1){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+uint8_t PZ6502::BCC(){
+    if(GetFlag(C) == 0){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+uint8_t PZ6502::BEQ(){
+    if(GetFlag(Z) == 1){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+uint8_t PZ6502::BNE(){
+    if(GetFlag(Z) == 0){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+uint8_t PZ6502::BMI(){
+    if(GetFlag(N) == 1){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+
+uint8_t PZ6502::BPL(){
+    if(GetFlag(N) == 0){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+uint8_t PZ6502::BVC(){
+    if(GetFlag(V) == 1){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+uint8_t PZ6502::BVS(){
+    if(GetFlag(V) == 0){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+uint8_t PZ6502::CLC(){
+    SetFlag(C, false);
+    return 0;
+}
+
+
+uint8_t PZ6502::CLD(){
+    SetFlag(D, false);
+    return 0;
+}
+
+
+
+
+
 
 
 /**
@@ -417,21 +430,132 @@ uint8_t PZ6502::SBC(){
     fetch();
 
     // invert the data
-    uint16_t inverted_M = ((uint16_t)m_fetched) ^ 0x00ff;
+    uint16_t inverted_M = ((uint16_t)fetched) ^ 0x00ff;
 
-    uint16_t temp = (uint16_t)m_accum + inverted_M + (uint16_t)GetFlag(C);
+    uint16_t temp = (uint16_t)accum + inverted_M + (uint16_t)GetFlag(C);
     SetFlag(C, temp & 0xff00);
     SetFlag(Z, (temp & 0x00ff) == 0);
     SetFlag(N, temp & 0x80);
-    SetFlag(V, ( ((uint16_t)m_accum ^ temp) & ~((uint16_t)m_accum ^ inverted_M) ) );
+    SetFlag(V, ( ((uint16_t)accum ^ temp) & ~((uint16_t)accum ^ inverted_M) ) );
 
-    m_accum = temp & 0x00ff;
+    accum = temp & 0x00ff;
     return 1;
 }
 
-// push accumulator on stack
+/**
+ *  push accumulator on stack
+ *  stack starts from end of 2nd page, aka 0x01ff
+ *  when push accumulator on stack, decrement the stack pointer
+ */
+
 uint8_t PZ6502::PHA(){
-    write(0x0100 + m_stkp, m_accum);
-    m_stkp--;
+    write(0x0100 + stkp, accum);
+    stkp--;
     return 0;
 }
+
+/**
+ * popping data from the stack
+ * increment the pointer before reading the data
+ */
+uint8_t PZ6502::PLA(){
+    stkp++;
+    accum = read(0x0100 + stkp);
+    SetFlag(Z, accum == 0x00);
+    SetFlag(N, accum & 0x80);
+    return 0;
+}
+
+void PZ6502::reset(){
+    accum = 0x00;
+    x_reg = 0x00;
+    x_reg = 0x00;
+    stkp = 0xff;
+    status = 0x00;
+
+    addrAbs = 0xfffc; // go to reset instruction in memory
+    uint16_t lo = read(addrAbs + 0);
+    uint16_t hi = read(addrAbs + 1);
+
+    pc = (hi << 8) | lo;
+    
+    addrAbs = 0x0000;
+    addrRel = 0x0000;
+    fetched = 0x00;
+
+    cycles = 8;
+}
+
+/**
+ * At the occurrence of interrupt, the value of the program counter (PC) is put in
+ * high-low order onto the stack, followed by the value currently in the status
+ * register and control will be transferred to the address location found in the
+ * respective interrupt vector. These are recovered from the stack at the end of
+ * an interrupt routine by the RTI instruction.
+*/
+
+void PZ6502::irq(){
+    if(GetFlag(I) == 0){
+        write(0x0100 + stkp, (pc >> 8) & 0x00ff);
+        stkp--;
+        write(0x0100 + stkp, pc & 0x00ff);
+        stkp--;
+
+        SetFlag(B, 0);
+        SetFlag(I, 1);
+        SetFlag(U, 1);
+        write(0x0100 + stkp, status);
+        stkp--;
+
+        addrAbs = 0xfffe;
+        uint16_t lo = read(addrAbs + 0);
+        uint16_t hi = read(addrAbs + 1);
+
+        pc = (hi << 8) | lo;
+
+        cycles = 7;
+    }
+}
+
+/**
+ * Similar to IRQ except nothing can stop NMI from happening
+  */
+void PZ6502::nmi(){
+    write(0x0100 + stkp, (pc >> 8) & 0x00ff);
+    stkp--;
+    write(0x0100 + stkp, pc & 0x00ff);
+    stkp--;
+
+    SetFlag(B, 0);
+    SetFlag(I, 1);
+    SetFlag(U, 1);
+    write(0x0100 + stkp, status);
+    stkp--;
+
+    addrAbs = 0xfffa;
+    uint16_t lo = read(addrAbs + 0);
+    uint16_t hi = read(addrAbs + 1);
+
+    pc = (hi << 8) | lo;
+
+    cycles = 7;
+}
+
+// Return from Interrupt
+uint8_t PZ6502::RTI(){
+    stkp++;
+
+    status = read(0x0100 + stkp);
+    SetFlag(B, 0);
+    SetFlag(U, 0);
+
+    stkp++;
+    uint16_t lo = read(0x0100 + stkp);
+    stkp++;
+    uint16_t hi = read(0x0100 + stkp);
+
+    pc = (hi << 8) | lo;
+    
+    return 0;
+}
+

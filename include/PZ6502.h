@@ -19,13 +19,13 @@ class PZ6502{
         void irq();         // interrupt request
         void nmi();         // non-maskable interrupt
 
-        uint8_t fetch();
-        uint8_t m_fetched = 0x00;
+        uint8_t fetch();    // used to fetch the data
+        uint8_t fetched = 0x00;   // store the fetched data
 
-        uint16_t m_addrAbs = 0x0000;
-        uint16_t m_addrRel = 0x00;
-        uint8_t m_opcode = 0x00;
-        uint8_t m_cycles = 0;
+        uint16_t addrAbs = 0x0000;
+        uint16_t addrRel = 0x0000;
+        uint8_t opcode = 0x00;
+        uint8_t cycles = 0;
 
     public:
         enum FLAGS6502{
@@ -39,12 +39,12 @@ class PZ6502{
             N = (1 << 7),   // Negative
         };
 
-        uint8_t m_accum = 0x00;     // Accumulator register
-        uint8_t m_xReg = 0x00;      // X register
-        uint8_t m_yReg = 0x00;      // Y register
-        uint8_t m_stkp = 0x00;      // Stack Pointer (points to location on bus)
-        uint16_t m_pc = 0x0000;     // Program counter
-        uint8_t m_status = 0x00;    // status register
+        uint8_t accum = 0x00;     // Accumulator register
+        uint8_t x_reg = 0x00;      // X register
+        uint8_t y_reg = 0x00;      // Y register
+        uint8_t stkp = 0x00;      // Stack Pointer (points to location on bus)
+        uint16_t pc = 0x0000;     // Program counter
+        uint8_t status = 0x00;    // status register
 
 
     private:
