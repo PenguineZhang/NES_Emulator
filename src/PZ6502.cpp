@@ -224,7 +224,7 @@ uint8_t PZ6502::fetch(){
 /**
  * Add Memory to Accumulator with Carry
  * A + M + C -> A, C
- * 
+ *
  * Truth table:
  *  A - accumulator
  *  M - fetched value
@@ -266,6 +266,23 @@ uint8_t PZ6502::AND(){
     SetFlag(N, accum & 0x80);
 
     return 1;
+}
+
+// Arithmetic shift left
+uint8_t PZ6502::ASL(){
+    fetch();
+    uint16_t temp = (uint16_t)fetched << 1;
+    SetFlag(C, (temp & 0xff00) > 0);
+    SetFlag(Z, (temp & 0x00ff) == 0);
+    SetFlag(N, temp & 0x80);
+
+    if (m_lookup[opcode].addrmode == &PZ6502::IMP){
+        accum = temp & 0x00ff;
+    } else {
+        write(addrAbs, temp & 0x00ff);
+    }
+
+    return 0;
 }
 
 // Branch on Carry Set
@@ -478,7 +495,7 @@ void PZ6502::reset(){
     uint16_t hi = read(addrAbs + 1);
 
     pc = (hi << 8) | lo;
-    
+
     addrAbs = 0x0000;
     addrRel = 0x0000;
     fetched = 0x00;
@@ -555,7 +572,7 @@ uint8_t PZ6502::RTI(){
     uint16_t hi = read(0x0100 + stkp);
 
     pc = (hi << 8) | lo;
-    
+
     return 0;
 }
 
