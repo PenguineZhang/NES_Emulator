@@ -245,7 +245,8 @@ uint8_t PZ6502::fetch(){
  *  1  1  1  0    0      1
  */
 uint8_t PZ6502::ADC(){
-    fetch();
+    fetched = fetch();
+
     uint16_t temp = (uint16_t)accum + (uint16_t)fetched + (uint16_t)GetFlag(C);
     SetFlag(C, temp > 255);
     SetFlag(Z, (temp & 0x00ff) == 0);
@@ -259,7 +260,8 @@ uint8_t PZ6502::ADC(){
 //AND Memory with Accumulator
 // A AND M -> A
 uint8_t PZ6502::AND(){
-    fetch();
+    fetched = fetch();
+
     accum = accum & fetched;
 
     SetFlag(Z, accum == 0x00);
@@ -270,7 +272,8 @@ uint8_t PZ6502::AND(){
 
 // Arithmetic shift left
 uint8_t PZ6502::ASL(){
-    fetch();
+    fetched = fetch();
+
     uint16_t temp = (uint16_t)fetched << 1;
     SetFlag(C, (temp & 0xff00) > 0);
     SetFlag(Z, (temp & 0x00ff) == 0);
@@ -284,6 +287,23 @@ uint8_t PZ6502::ASL(){
 
     return 0;
 }
+
+// branch on carry clear
+uint8_t PZ6502::BCC(){
+    if(GetFlag(C) == 0){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
 
 // Branch on Carry Set
 // branch on C = 1
@@ -303,22 +323,7 @@ uint8_t PZ6502::BCS(){
 }
 
 
-uint8_t PZ6502::BCC(){
-    if(GetFlag(C) == 0){
-        cycles++;
-        addrAbs = pc + addrRel;
-
-        if((addrAbs & 0xff00) != (pc & 0xff00)){
-            cycles++;
-        }
-
-        pc = addrAbs;
-    }
-
-    return 0;
-}
-
-
+// branch on equal (zero set)
 uint8_t PZ6502::BEQ(){
     if(GetFlag(Z) == 1){
         cycles++;
@@ -334,23 +339,21 @@ uint8_t PZ6502::BEQ(){
     return 0;
 }
 
+// Test Bits in Memory with Accumulator
+uint8_t PZ6502::BIT(){
+    fetch();
+    
+    uint8_t temp = accum & fetched;
 
-uint8_t PZ6502::BNE(){
-    if(GetFlag(Z) == 0){
-        cycles++;
-        addrAbs = pc + addrRel;
-
-        if((addrAbs & 0xff00) != (pc & 0xff00)){
-            cycles++;
-        }
-
-        pc = addrAbs;
-    }
+    SetFlag(N, (fetched & 0x40));
+    SetFlag(V, (fetched & 0x20));
+    SetFlag(Z, (temp == 0x00));
 
     return 0;
 }
 
 
+// branch on minus (negative set)
 uint8_t PZ6502::BMI(){
     if(GetFlag(N) == 1){
         cycles++;
@@ -368,6 +371,24 @@ uint8_t PZ6502::BMI(){
 
 
 
+// branch on not equal (zero clear)
+uint8_t PZ6502::BNE(){
+    if(GetFlag(Z) == 0){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+// branch on plus (negative clear)
 uint8_t PZ6502::BPL(){
     if(GetFlag(N) == 0){
         cycles++;
@@ -383,24 +404,33 @@ uint8_t PZ6502::BPL(){
     return 0;
 }
 
+// Force Break
+// similar to irq
+// reference: https://www.pagetable.com/?p=410
+uint8_t PZ6502::BRK(){
+    pc++;
 
-uint8_t PZ6502::BVC(){
-    if(GetFlag(V) == 1){
-        cycles++;
-        addrAbs = pc + addrRel;
+    SetFlag(I, 1);
+    write(0x0100 + stkp, (pc >> 8) && 0x00ff);
+    stkp--;
+    write(0x0100 + stkp, pc & 0x00ff);
+    stkp--;
 
-        if((addrAbs & 0xff00) != (pc & 0xff00)){
-            cycles++;
-        }
+    SetFlag(B, 1);
+    write(0x0100 + stkp, status);
+    stkp--;
 
-        pc = addrAbs;
-    }
+    // SetFlag(B, 0); // test without this line
+
+    //             hi bytes                     lo bytes
+    pc = (uint16_t)(read(0xffff) << 8) | (uint16_t)(read(0xfffe));
 
     return 0;
 }
 
 
-uint8_t PZ6502::BVS(){
+// Branch on Overflow Clear
+uint8_t PZ6502::BVC(){
     if(GetFlag(V) == 0){
         cycles++;
         addrAbs = pc + addrRel;
@@ -416,20 +446,272 @@ uint8_t PZ6502::BVS(){
 }
 
 
+// Branch on Overflow Set
+uint8_t PZ6502::BVS(){
+    if(GetFlag(V) == 1){
+        cycles++;
+        addrAbs = pc + addrRel;
+
+        if((addrAbs & 0xff00) != (pc & 0xff00)){
+            cycles++;
+        }
+
+        pc = addrAbs;
+    }
+
+    return 0;
+}
+
+
+// Clear Carry Flag
 uint8_t PZ6502::CLC(){
-    SetFlag(C, false);
+    SetFlag(C, 0);
     return 0;
 }
 
 
+// Clear Decimal Mode
 uint8_t PZ6502::CLD(){
-    SetFlag(D, false);
+    SetFlag(D, 0);
     return 0;
 }
 
 
+//Clear Interrupt Disable Bit
+uint8_t PZ6502::CLI(){
+    SetFlag(I, 0);
+    return 0;
+}
+
+// Clear Overflow Flag
+uint8_t PZ6502::CLV(){
+    SetFlag(V, 0);
+    return 0;
+}
+
+// Compare Memory with Accumulator
+// reference: 6502.org/tutorials/compare_instructions.html
+uint8_t PZ6502::CMP(){
+    fetched = fetch();
+
+    uint16_t temp = (uint16_t)accum - (uint16_t)fetched;
+
+    SetFlag(N, temp & 0x0080);
+    SetFlag(Z, accum == fetched);
+    SetFlag(C, (accum >= fetched));
+
+    // according to the dataset, CMP can potential require additional cycle
+    return 1;
+}
+
+// Compare Memory with x register
+uint8_t PZ6502::CPX(){
+    fetched = fetch();
+
+    uint16_t temp = (uint16_t)x_reg - (uint16_t)fetched;
+
+    SetFlag(N, temp & 0x0080);
+    SetFlag(Z, x_reg == fetched);
+    SetFlag(C, (x_reg >= fetched));
+
+    return 0;
+}
 
 
+// Compare Memory with x register
+uint8_t PZ6502::CPY(){
+    fetched = fetch();
+
+    uint16_t temp = (uint16_t)y_reg - (uint16_t)fetched;
+
+    SetFlag(N, temp & 0x0080);
+    SetFlag(Z, y_reg == fetched);
+    SetFlag(C, (y_reg >= fetched));
+
+    return 0;
+}
+
+
+// Decrement Memory by One
+uint8_t PZ6502::DEC(){
+    fetched = fetch();
+
+    uint16_t temp = (uint16_t)fetched - 1;
+    write(addrAbs, temp & 0x00ff);
+
+    SetFlag(Z, (temp & 0x00ff) == 0x0000);
+    SetFlag(N, temp & 0x0080);
+
+    return 0;
+}
+
+
+// Decrement x register by One
+uint8_t PZ6502::DEX(){
+
+    x_reg--;
+    SetFlag(Z, x_reg == 0x00);
+    SetFlag(N, x_reg & 0x80);
+
+    return 0;
+}
+
+// Decrement x register by One
+uint8_t PZ6502::DEY(){
+
+    y_reg--;
+    SetFlag(Z, y_reg == 0x00);
+    SetFlag(N, y_reg & 0x80);
+
+    return 0;
+}
+
+
+// Exclusive-OR Memory with Accumulator
+uint8_t PZ6502::EOR(){
+    fetched = fetch();
+
+    accum = accum ^ fetched;
+
+    SetFlag(N, accum & 0x80);
+    SetFlag(Z, accum == 0x00);
+
+    return 1;
+}
+
+
+// Increment Memory by One
+uint8_t PZ6502::INC(){
+    fetched = fetch();
+
+    uint16_t temp = (uint16_t)fetched + 1;
+    SetFlag(N, temp & 0x0080);
+    SetFlag(Z, (temp & 0x00ff) == 0);
+    write(addrAbs, temp & 0x00ff);
+    return 0;
+}
+
+
+// Increment X register by one
+uint8_t PZ6502::INX(){
+    x_reg++;
+    SetFlag(N, x_reg & 0x80);
+    SetFlag(Z, x_reg == 0x00);
+    return 0;
+}
+
+
+// Increment X register by one
+uint8_t PZ6502::INY(){
+    y_reg++;
+    SetFlag(N, y_reg & 0x80);
+    SetFlag(Z, y_reg == 0x00);
+    return 0;
+}
+
+
+/**
+ * Sets the program counter to the address specified by the operand.
+ */
+uint8_t PZ6502::JMP(){
+    pc = addrAbs;
+    return 0;
+}
+
+
+/**
+ * The JSR instruction pushes the address (minus one) of the 
+ * return point on to the stack and then sets the program counter 
+ * to the target memory address.
+ */ 
+uint8_t PZ6502::JSR(){
+    pc--;
+
+    write(0x0100 + stkp, (pc & 0xff00) >> 8);
+    stkp--;
+    write(0x0100 + stkp, (pc & 0x00ff));
+    stkp--;
+
+    pc = addrAbs;
+
+    return 0;
+}
+
+/**
+ * LDA - Load Accumulator
+ * A,Z,N = M
+ * 
+ * Loads a byte of memory into the accumulator setting 
+ * the zero and negative flags as appropriate.
+ */
+uint8_t PZ6502::LDA(){
+    fetched = fetch();
+
+    accum = fetched;
+    SetFlag(Z, accum == 0x00);
+    SetFlag(N, accum & 0x80);
+
+    return 1;
+}
+
+
+/**
+ * LDX - Load X Register
+ * X,Z,N = M
+ * Loads a byte of memory into the X register 
+ * setting the zero and negative flags as appropriate.
+ */
+uint8_t PZ6502::LDX(){
+    fetched = fetch();
+    x_reg = fetched;
+    SetFlag(Z, x_reg == 0x00);
+    SetFlag(N, x_reg & 0x80);
+
+    return 1;
+}
+
+
+/**
+ * LDX - Load X Register
+ * X,Z,N = M
+ * Loads a byte of memory into the X register 
+ * setting the zero and negative flags as appropriate.
+ */
+uint8_t PZ6502::LDY(){
+    fetched = fetch();
+    y_reg = fetched;
+    SetFlag(Z, y_reg == 0x00);
+    SetFlag(N, y_reg & 0x80);
+
+    return 1;
+}
+
+
+/**
+ * LSR - Logical Shift Right
+ * 
+ * A,C,Z,N = A/2 or M,C,Z,N = M/2
+ * 
+ * Each of the bits in A or M is shift one place to the right. 
+ * The bit that was in bit 0 is shifted into the carry flag. Bit 7 is set to zero.
+ */
+uint8_t PZ6502::LSR(){
+    fetched = fetch();
+
+    SetFlag(C, (fetched & 0x01));
+
+    uint16_t temp = (uint16_t)fetched >> 1;
+    SetFlag(Z, (temp & 0x00ff) == 0);
+    SetFlag(N, temp & 0x0080);
+
+    if (m_lookup[opcode].addrmode == &PZ6502::IMP){
+        accum = temp & 0x00ff;
+    } else {
+        write(addrAbs, temp & 0x00ff);
+    }
+
+    return 0;
+}
 
 
 
@@ -576,3 +858,133 @@ uint8_t PZ6502::RTI(){
     return 0;
 }
 
+
+bool PZ6502::complete(){
+    return cycles == 0;
+}
+
+
+// This is the disassembly function. Its workings are not required for emulation.
+// It is merely a convenience function to turn the binary instruction code into
+// human readable form. Its included as part of the emulator because it can take
+// advantage of many of the CPUs internal operations to do this.
+std::map<uint16_t, std::string> PZ6502::disassemble(uint16_t nStart, uint16_t nStop)
+{
+	uint32_t addr = nStart;
+	uint8_t value = 0x00, lo = 0x00, hi = 0x00;
+	std::map<uint16_t, std::string> mapLines;
+	uint16_t line_addr = 0;
+
+	// A convenient utility to convert variables into
+	// hex strings because "modern C++"'s method with 
+	// streams is atrocious
+	auto hex = [](uint32_t n, uint8_t d)
+	{
+		std::string s(d, '0');
+		for (int i = d - 1; i >= 0; i--, n >>= 4)
+			s[i] = "0123456789ABCDEF"[n & 0xF];
+		return s;
+	};
+
+	// Starting at the specified address we read an instruction
+	// byte, which in turn yields information from the lookup table
+	// as to how many additional bytes we need to read and what the
+	// addressing mode is. I need this info to assemble human readable
+	// syntax, which is different depending upon the addressing mode
+
+	// As the instruction is decoded, a std::string is assembled
+	// with the readable output
+	while (addr <= (uint32_t)nStop)
+	{
+		line_addr = addr;
+
+		// Prefix line with instruction address
+		std::string sInst = "$" + hex(addr, 4) + ": ";
+
+		// Read instruction, and get its readable name
+		uint8_t opcode = m_bus->read(addr, true); addr++;
+		sInst += m_lookup[opcode].name + " ";
+
+		// Get oprands from desired locations, and form the
+		// instruction based upon its addressing mode. These
+		// routines mimmick the actual fetch routine of the
+		// 6502 in order to get accurate data as part of the
+		// instruction
+		if (m_lookup[opcode].addrmode == &PZ6502::IMP)
+		{
+			sInst += " {IMP}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::IMM)
+		{
+			value = m_bus->read(addr, true); addr++;
+			sInst += "#$" + hex(value, 2) + " {IMM}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::ZP0)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = 0x00;												
+			sInst += "$" + hex(lo, 2) + " {ZP0}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::ZPX)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = 0x00;														
+			sInst += "$" + hex(lo, 2) + ", X {ZPX}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::ZPY)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = 0x00;														
+			sInst += "$" + hex(lo, 2) + ", Y {ZPY}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::IZX)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = 0x00;								
+			sInst += "($" + hex(lo, 2) + ", X) {IZX}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::IZY)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = 0x00;								
+			sInst += "($" + hex(lo, 2) + "), Y {IZY}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::ABS)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = m_bus->read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + " {ABS}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::ABX)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = m_bus->read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", X {ABX}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::ABY)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = m_bus->read(addr, true); addr++;
+			sInst += "$" + hex((uint16_t)(hi << 8) | lo, 4) + ", Y {ABY}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::IND)
+		{
+			lo = m_bus->read(addr, true); addr++;
+			hi = m_bus->read(addr, true); addr++;
+			sInst += "($" + hex((uint16_t)(hi << 8) | lo, 4) + ") {IND}";
+		}
+		else if (m_lookup[opcode].addrmode == &PZ6502::REL)
+		{
+			value = m_bus->read(addr, true); addr++;
+			sInst += "$" + hex(value, 2) + " [$" + hex(addr + value, 4) + "] {REL}";
+		}
+
+		// Add the formed string to a std::map, using the instruction's
+		// address as the key. This makes it convenient to look for later
+		// as the instructions are variable in length, so a straight up
+		// incremental index is not sufficient.
+		mapLines[line_addr] = sInst;
+	}
+
+	return mapLines;
+}

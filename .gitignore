@@ -33,3 +33,6 @@
 
 # VS code config folder
 .vscode/
+
+# build directory
+build/

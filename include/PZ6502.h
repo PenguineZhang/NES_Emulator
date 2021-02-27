@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <map>  // for disasember
 #include <vector> // store INSTRUCTIONS
 
 //! Forward declaration of generic communication
@@ -14,19 +15,21 @@ class PZ6502{
         ~PZ6502();
         void ConnectBus(Bus *n){ m_bus = n; }
 
-        void clock();
-        void reset();
-        void irq();         // interrupt request
-        void nmi();         // non-maskable interrupt
-
-        uint8_t fetch();    // used to fetch the data
         uint8_t fetched = 0x00;   // store the fetched data
-
         uint16_t addrAbs = 0x0000;
         uint16_t addrRel = 0x0000;
         uint8_t opcode = 0x00;
         uint8_t cycles = 0;
 
+    public:
+        void clock();
+        void reset();
+        void irq();         // interrupt request
+        void nmi();         // non-maskable interrupt
+        uint8_t fetch();    // used to fetch the data
+        bool complete();  // when cycles equals 0
+        std::map<uint16_t, std::string> disassemble(uint16_t, uint16_t);
+        
     public:
         enum FLAGS6502{
             C = (1 << 0),   // Carry bit
