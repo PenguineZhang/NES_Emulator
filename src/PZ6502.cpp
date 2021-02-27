@@ -342,7 +342,7 @@ uint8_t PZ6502::BEQ(){
 // Test Bits in Memory with Accumulator
 uint8_t PZ6502::BIT(){
     fetch();
-    
+
     uint8_t temp = accum & fetched;
 
     SetFlag(N, (fetched & 0x40));
@@ -620,10 +620,10 @@ uint8_t PZ6502::JMP(){
 
 
 /**
- * The JSR instruction pushes the address (minus one) of the 
- * return point on to the stack and then sets the program counter 
+ * The JSR instruction pushes the address (minus one) of the
+ * return point on to the stack and then sets the program counter
  * to the target memory address.
- */ 
+ */
 uint8_t PZ6502::JSR(){
     pc--;
 
@@ -640,8 +640,8 @@ uint8_t PZ6502::JSR(){
 /**
  * LDA - Load Accumulator
  * A,Z,N = M
- * 
- * Loads a byte of memory into the accumulator setting 
+ *
+ * Loads a byte of memory into the accumulator setting
  * the zero and negative flags as appropriate.
  */
 uint8_t PZ6502::LDA(){
@@ -658,7 +658,7 @@ uint8_t PZ6502::LDA(){
 /**
  * LDX - Load X Register
  * X,Z,N = M
- * Loads a byte of memory into the X register 
+ * Loads a byte of memory into the X register
  * setting the zero and negative flags as appropriate.
  */
 uint8_t PZ6502::LDX(){
@@ -674,7 +674,7 @@ uint8_t PZ6502::LDX(){
 /**
  * LDX - Load X Register
  * X,Z,N = M
- * Loads a byte of memory into the X register 
+ * Loads a byte of memory into the X register
  * setting the zero and negative flags as appropriate.
  */
 uint8_t PZ6502::LDY(){
@@ -689,10 +689,10 @@ uint8_t PZ6502::LDY(){
 
 /**
  * LSR - Logical Shift Right
- * 
+ *
  * A,C,Z,N = A/2 or M,C,Z,N = M/2
- * 
- * Each of the bits in A or M is shift one place to the right. 
+ *
+ * Each of the bits in A or M is shift one place to the right.
  * The bit that was in bit 0 is shifted into the carry flag. Bit 7 is set to zero.
  */
 uint8_t PZ6502::LSR(){
@@ -713,6 +713,77 @@ uint8_t PZ6502::LSR(){
     return 0;
 }
 
+uint8_t PZ6502::NOP(){
+    return 0;
+}
+
+uint8_t PZ6502::ORA(){
+    return 0;
+}
+
+/**
+ *  push accumulator on stack
+ *  stack starts from end of 2nd page, aka 0x01ff
+ *  when push accumulator on stack, decrement the stack pointer
+ */
+
+uint8_t PZ6502::PHA(){
+    write(0x0100 + stkp, accum);
+    stkp--;
+    return 0;
+}
+
+uint8_t PZ6502::PHP(){
+    return 0;
+}
+
+/**
+ * popping data from the stack
+ * increment the pointer before reading the data
+ */
+uint8_t PZ6502::PLA(){
+    stkp++;
+    accum = read(0x0100 + stkp);
+    SetFlag(Z, accum == 0x00);
+    SetFlag(N, accum & 0x80);
+    return 0;
+}
+
+uint8_t PZ6502::PLP(){
+    return 0;
+}
+
+
+uint8_t PZ6502::ROL(){
+    return 0;
+}
+
+
+uint8_t PZ6502::ROR(){
+    return 0;
+}
+
+// Return from Interrupt
+uint8_t PZ6502::RTI(){
+    stkp++;
+
+    status = read(0x0100 + stkp);
+    SetFlag(B, 0);
+    SetFlag(U, 0);
+
+    stkp++;
+    uint16_t lo = read(0x0100 + stkp);
+    stkp++;
+    uint16_t hi = read(0x0100 + stkp);
+
+    pc = (hi << 8) | lo;
+
+    return 0;
+}
+
+uint8_t PZ6502::RTS(){
+    return 0;
+}
 
 
 /**
@@ -741,29 +812,58 @@ uint8_t PZ6502::SBC(){
     return 1;
 }
 
-/**
- *  push accumulator on stack
- *  stack starts from end of 2nd page, aka 0x01ff
- *  when push accumulator on stack, decrement the stack pointer
- */
-
-uint8_t PZ6502::PHA(){
-    write(0x0100 + stkp, accum);
-    stkp--;
+uint8_t PZ6502::SEC(){
     return 0;
 }
 
-/**
- * popping data from the stack
- * increment the pointer before reading the data
- */
-uint8_t PZ6502::PLA(){
-    stkp++;
-    accum = read(0x0100 + stkp);
-    SetFlag(Z, accum == 0x00);
-    SetFlag(N, accum & 0x80);
+uint8_t PZ6502::SED(){
     return 0;
 }
+
+uint8_t PZ6502::SEI(){
+    return 0;
+}
+
+uint8_t PZ6502::STA(){
+    return 0;
+}
+
+uint8_t PZ6502::STX(){
+    return 0;
+}
+
+uint8_t PZ6502::STY(){
+    return 0;
+}
+
+uint8_t PZ6502::TAX(){
+    return 0;
+}
+
+uint8_t PZ6502::TAY(){
+    return 0;
+}
+
+uint8_t PZ6502::TSX(){
+    return 0;
+}
+
+uint8_t PZ6502::TXA(){
+    return 0;
+}
+
+uint8_t PZ6502::TXS(){
+    return 0;
+}
+
+uint8_t PZ6502::TYA(){
+    return 0;
+}
+
+uint8_t PZ6502::XXX(){
+    return 0;
+}
+
 
 void PZ6502::reset(){
     accum = 0x00;
@@ -840,23 +940,7 @@ void PZ6502::nmi(){
     cycles = 7;
 }
 
-// Return from Interrupt
-uint8_t PZ6502::RTI(){
-    stkp++;
 
-    status = read(0x0100 + stkp);
-    SetFlag(B, 0);
-    SetFlag(U, 0);
-
-    stkp++;
-    uint16_t lo = read(0x0100 + stkp);
-    stkp++;
-    uint16_t hi = read(0x0100 + stkp);
-
-    pc = (hi << 8) | lo;
-
-    return 0;
-}
 
 
 bool PZ6502::complete(){
@@ -876,7 +960,7 @@ std::map<uint16_t, std::string> PZ6502::disassemble(uint16_t nStart, uint16_t nS
 	uint16_t line_addr = 0;
 
 	// A convenient utility to convert variables into
-	// hex strings because "modern C++"'s method with 
+	// hex strings because "modern C++"'s method with
 	// streams is atrocious
 	auto hex = [](uint32_t n, uint8_t d)
 	{
@@ -922,31 +1006,31 @@ std::map<uint16_t, std::string> PZ6502::disassemble(uint16_t nStart, uint16_t nS
 		else if (m_lookup[opcode].addrmode == &PZ6502::ZP0)
 		{
 			lo = m_bus->read(addr, true); addr++;
-			hi = 0x00;												
+			hi = 0x00;
 			sInst += "$" + hex(lo, 2) + " {ZP0}";
 		}
 		else if (m_lookup[opcode].addrmode == &PZ6502::ZPX)
 		{
 			lo = m_bus->read(addr, true); addr++;
-			hi = 0x00;														
+			hi = 0x00;
 			sInst += "$" + hex(lo, 2) + ", X {ZPX}";
 		}
 		else if (m_lookup[opcode].addrmode == &PZ6502::ZPY)
 		{
 			lo = m_bus->read(addr, true); addr++;
-			hi = 0x00;														
+			hi = 0x00;
 			sInst += "$" + hex(lo, 2) + ", Y {ZPY}";
 		}
 		else if (m_lookup[opcode].addrmode == &PZ6502::IZX)
 		{
 			lo = m_bus->read(addr, true); addr++;
-			hi = 0x00;								
+			hi = 0x00;
 			sInst += "($" + hex(lo, 2) + ", X) {IZX}";
 		}
 		else if (m_lookup[opcode].addrmode == &PZ6502::IZY)
 		{
 			lo = m_bus->read(addr, true); addr++;
-			hi = 0x00;								
+			hi = 0x00;
 			sInst += "($" + hex(lo, 2) + "), Y {IZY}";
 		}
 		else if (m_lookup[opcode].addrmode == &PZ6502::ABS)

@@ -22,7 +22,7 @@ class Bus{
 
     public:
         void write(uint16_t addr, uint8_t data);
-        uint8_t read(uint16_t addr, bool bReadOnly=false);
+        uint8_t read(uint16_t addr, bool bReadOnly);
 };
 
 #endif //BUS_H__
