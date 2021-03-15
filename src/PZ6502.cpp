@@ -66,7 +66,7 @@ void PZ6502::clock(){
         // get starting number of cycles
         cycles = m_lookup[opcode].cycle;
 
-        // fetch intermediate data
+        // perform addrmode to get the memory address for operand
         uint8_t additional_cycle1 = (this->*m_lookup[opcode].addrmode)();
 
         // perform operation
@@ -79,16 +79,49 @@ void PZ6502::clock(){
 }
 
 // addressing mode
+
+/**
+ * Implicit
+ *
+ * For many 6502 instructions the source and destination
+ * of the information to be manipulated is implied directly
+ * by the function of the instruction itself and no further
+ *  operand needs to be specified. Operations like 'Clear Carry Flag'
+ * (CLC) and 'Return from Subroutine' (RTS) are implicit.
+ */
 uint8_t PZ6502::IMP(){
     fetched = accum;
     return 0;
 }
 
+
+/**
+ * Immediate
+ *
+ * Immediate addressing allows the programmer to directly specify
+ * an 8 bit constant within the instruction. It is indicated by
+ * a '#' symbol followed by an numeric expression
+ */
 uint8_t PZ6502::IMM(){
     addrAbs = pc++;
     return 0;
 }
 
+
+/**
+ * Zero Page
+ *
+ * This limits it to addressing only the first 256 bytes of
+ * memory (e.g. $0000 to $00FF) where the most significant
+ * byte of the address is always zero. In zero page mode only
+ * the least significant byte of the address is held in the
+ * instruction making it shorter by one byte (important for
+ * space saving) and one less memory fetch during execution (important for speed).
+ *
+ * An assembler will automatically select zero page addressing
+ * mode if the operand evaluates to a zero page address and the
+ * instruction supports the mode (not all do).
+ */
 uint8_t PZ6502::ZP0(){
     addrAbs = read(pc);
     pc++;
@@ -96,6 +129,23 @@ uint8_t PZ6502::ZP0(){
     return 0;
 }
 
+/**
+ * Zero Page,X
+ *
+ * The address to be accessed by an instruction using
+ * indexed zero page addressing is calculated by taking
+ * the 8 bit zero page address from the instruction and
+ * adding the current value of the X register to it.
+ * For example if the X register contains $0F and
+ * the instruction LDA $80,X is executed then the accumulator
+ * will be loaded from $008F (e.g. $80 + $0F => $8F).
+ *
+ * The address calculation wraps around if the sum of the base
+ * address and the register exceed $FF. If we repeat the last
+ * example but with $FF in the X register then the accumulator
+ * will be loaded from $007F (e.g. $80 + $FF => $7F) and not $017F.
+ *
+ */
 uint8_t PZ6502::ZPX(){
     addrAbs = read(pc) + x_reg;
     pc++;
@@ -103,6 +153,15 @@ uint8_t PZ6502::ZPX(){
     return 0;
 }
 
+/**
+ * Zero Page,Y
+ *
+ * The address to be accessed by an instruction using
+ * indexed zero page addressing is calculated by taking
+ * the 8 bit zero page address from the instruction and
+ * adding the current value of the Y register to it.
+ * This mode can only be used with the LDX and STX instructions.
+ */
 uint8_t PZ6502::ZPY(){
     addrAbs = read(pc) + y_reg;
     pc++;
@@ -110,6 +169,20 @@ uint8_t PZ6502::ZPY(){
     return 0;
 }
 
+
+/**
+ * Relative
+ *
+ * Relative addressing mode is used by branch
+ * instructions (e.g. BEQ, BNE, etc.) which contain a
+ * signed 8 bit relative offset (e.g. -128 to +127) which
+ * is added to program counter if the condition is true.
+ * As the program counter itself is incremented during
+ * instruction execution by two the effective address range
+ * for the target instruction must be with -126 to +129 bytes
+ * of the branch.
+ *
+ */
 uint8_t PZ6502::REL(){
     addrRel = read(pc);
     pc++;
@@ -121,6 +194,11 @@ uint8_t PZ6502::REL(){
     return 0;
 }
 
+
+/**
+ * Instructions using absolute addressing contain a full 16 bit
+ * address to identify the target location.
+ */
 uint8_t PZ6502::ABS(){
     uint16_t lo = read(pc);
     pc++;
@@ -131,6 +209,16 @@ uint8_t PZ6502::ABS(){
     return 0;
 }
 
+
+/**
+ * Absolute,X
+ *
+ * The address to be accessed by an instruction using X register
+ * indexed absolute addressing is computed by taking the 16 bit address
+ * from the instruction and added the contents of the X register.
+ * For example if X contains $92 then an STA $2000,X instruction will
+ * store the accumulator at $2092 (e.g. $2000 + $92).
+ */
 uint8_t PZ6502::ABX(){
     uint16_t lo = read(pc);
     pc++;
@@ -147,6 +235,14 @@ uint8_t PZ6502::ABX(){
     }
 }
 
+
+/**
+ * Absolute,Y
+ *
+ * The Y register indexed absolute addressing mode is the same
+ * as the previous mode only with the contents of the Y register
+ * added to the 16 bit address from the instruction.
+ */
 uint8_t PZ6502::ABY(){
     uint16_t lo = read(pc);
     pc++;
@@ -163,6 +259,19 @@ uint8_t PZ6502::ABY(){
     }
 }
 
+
+/**
+ * Indirect
+ *
+ * JMP is the only 6502 instruction to support indirection.
+ * The instruction contains a 16 bit address which identifies
+ * the location of the least significant byte of another 16 bit memory
+ * address which is the real target of the instruction.
+ *
+ * For example if location $0120 contains $FC and location $0121 contains
+ * $BA then the instruction JMP ($0120) will cause the next instruction
+ * execution to occur at $BAFC (e.g. the contents of $0120 and $0121).
+ */
 uint8_t PZ6502::IND(){
     uint16_t ptr_lo = read(pc);
     pc++;
@@ -180,6 +289,15 @@ uint8_t PZ6502::IND(){
     return 0;
 }
 
+/**
+ * Indexed Indirect
+ *
+ * Indexed indirect addressing is normally used in conjunction with
+ * a table of address held on zero page. The address of the table is
+ * taken from the instruction and the X register added to it (with zero
+ * page wrap around) to give the location of the least significant byte
+ * of the target address.
+ */
 uint8_t PZ6502::IZX(){
     uint16_t t = read(pc);
     pc++;
@@ -209,6 +327,16 @@ uint8_t PZ6502::IZY(){
     }
 }
 
+
+/**
+ * Indirect Indexed
+ *
+ * Indirect indirect addressing is the most common indirection mode
+ * used on the 6502. In instruction contains the zero page location
+ * of the least significant byte of 16 bit address. The Y register
+ * is dynamically added to this value to generated the actual target
+ * address for operation.
+ */
 uint8_t PZ6502::fetch(){
     if(!(m_lookup[opcode].addrmode == &PZ6502::IMP)){
         fetched = read(addrAbs);
@@ -339,9 +467,10 @@ uint8_t PZ6502::BEQ(){
     return 0;
 }
 
+
 // Test Bits in Memory with Accumulator
 uint8_t PZ6502::BIT(){
-    fetch();
+    fetched = fetch();
 
     uint8_t temp = accum & fetched;
 
@@ -713,12 +842,21 @@ uint8_t PZ6502::LSR(){
     return 0;
 }
 
+/**
+ * NOP - No Operation
+ * NOP is used to reserve space for future modifications or
+ * effectively REM out existing code.
+ */
 uint8_t PZ6502::NOP(){
     return 0;
 }
 
 uint8_t PZ6502::ORA(){
-    return 0;
+    fetched = fetch();
+    accum = accum | fetched;
+    SetFlag(N, accum & 0x80);
+    SetFlag(Z, accum == 0x00);
+    return 1;
 }
 
 /**
@@ -733,7 +871,17 @@ uint8_t PZ6502::PHA(){
     return 0;
 }
 
+/**
+ * PHP
+ * Push Processor Status on Stack
+ */
 uint8_t PZ6502::PHP(){
+    // alternative: break flag is set to 1 before push
+    // write(0x0100 + stkp, status | B | U)
+    // SetFlag(B, 0);
+    // SetFlag(U, 0);
+    write(0x0100 + stkp, status);
+    stkp--;
     return 0;
 }
 
@@ -749,12 +897,17 @@ uint8_t PZ6502::PLA(){
     return 0;
 }
 
+
+
 uint8_t PZ6502::PLP(){
+    stkp++;
+    status = read(0x0100 + stkp);
     return 0;
 }
 
 
 uint8_t PZ6502::ROL(){
+
     return 0;
 }
 
@@ -797,7 +950,7 @@ uint8_t PZ6502::RTS(){
  * A = A + M + C
  */
 uint8_t PZ6502::SBC(){
-    fetch();
+    fetched = fetch();
 
     // invert the data
     uint16_t inverted_M = ((uint16_t)fetched) ^ 0x00ff;
@@ -813,50 +966,72 @@ uint8_t PZ6502::SBC(){
 }
 
 uint8_t PZ6502::SEC(){
+    SetFlag(C, 1);
     return 0;
 }
 
 uint8_t PZ6502::SED(){
+    SetFlag(D, 1);
     return 0;
 }
 
 uint8_t PZ6502::SEI(){
+    SetFlag(I, 1);
     return 0;
 }
 
 uint8_t PZ6502::STA(){
+    write(addrAbs, accum);
     return 0;
 }
 
 uint8_t PZ6502::STX(){
+    write(addrAbs, x_reg);
     return 0;
 }
 
 uint8_t PZ6502::STY(){
+    write(addrAbs, y_reg);
     return 0;
 }
 
 uint8_t PZ6502::TAX(){
+    x_reg = accum;
+    SetFlag(N, x_reg & 0x80);
+    SetFlag(Z, x_reg == 0);
     return 0;
 }
 
 uint8_t PZ6502::TAY(){
+    y_reg = accum;
+    SetFlag(N, y_reg & 0x80);
+    SetFlag(Z, y_reg == 0x00);
     return 0;
 }
 
 uint8_t PZ6502::TSX(){
+    x_reg = stkp;
+    SetFlag(N, x_reg & 0x80);
+    SetFlag(Z, x_reg == 0x00);
     return 0;
 }
 
 uint8_t PZ6502::TXA(){
+    accum = x_reg;
+    SetFlag(N, accum & 0x80);
+    SetFlag(Z, accum == 0x00);
     return 0;
 }
 
 uint8_t PZ6502::TXS(){
+    stkp = x_reg;
     return 0;
 }
 
 uint8_t PZ6502::TYA(){
+    accum = y_reg;
+    SetFlag(N, accum & 0x80);
+    SetFlag(Z, accum == 0x00);
     return 0;
 }
 
