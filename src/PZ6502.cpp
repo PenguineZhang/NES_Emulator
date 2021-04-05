@@ -39,7 +39,7 @@ void PZ6502::write(uint16_t addr, uint8_t dat){
 
 
 uint8_t PZ6502::GetFlag(FLAGS6502 f){
-
+    return (status & f) == 0 ? 0 : 1;
 }
 
 /**
@@ -834,7 +834,8 @@ uint8_t PZ6502::LSR(){
     SetFlag(N, temp & 0x0080);
 
     if (m_lookup[opcode].addrmode == &PZ6502::IMP){
-        accum = temp & 0x00ff;
+        // accum = temp & 0x00ff;
+        accum = accum >> 1;
     } else {
         write(addrAbs, temp & 0x00ff);
     }
@@ -898,21 +899,63 @@ uint8_t PZ6502::PLA(){
 }
 
 
-
+/**
+ * PuLl Processor status
+ * Pulls an 8 bit value from the stack and into the processor flags.
+ * The flags will take on new states as determined by the value pulled.
+ */
 uint8_t PZ6502::PLP(){
     stkp++;
     status = read(0x0100 + stkp);
     return 0;
 }
 
-
+/**
+ * ROL shifts all bits left one position.
+ * The Carry is shifted into bit 0 and the original bit 7 is
+ * shifted into the Carry.
+ *
+ * Affect flags: N Z C
+ */
 uint8_t PZ6502::ROL(){
+    fetched = fetch();
 
+    uint16_t temp = (uint16_t)(fetched << 1) | GetFlag(C);
+
+    SetFlag(C, temp & 0x0080);
+    SetFlag(Z, (temp & 0x00ff) == 0x0000);
+    SetFlag(N, temp & 0x0080);
+
+    if(m_lookup[opcode].addrmode == &PZ6502::IMP){
+        accum = temp & 0x00ff;
+    }else{
+        write(addrAbs, temp & 0x00ff);
+    }
     return 0;
 }
 
 
+/**
+ * Move each of the bits in either A or M one place to the right.
+ * Bit 7 is filled with the current value of the carry flag
+ * whilst the old bit 0 becomes the new carry flag value.
+ *
+ * Affect flags: N Z C
+ */
 uint8_t PZ6502::ROR(){
+    fetched = fetch();
+
+    uint16_t temp = (uint16_t)(fetched >> 1) | (GetFlag(C) << 7);
+
+    SetFlag(C, fetched & 0x01);
+    SetFlag(Z, (temp & 0x00ff) == 0x0000);
+    SetFlag(N, temp & 0x0080);
+
+    if(m_lookup[opcode].addrmode == &PZ6502::IMP){
+        accum = temp & 0x00ff;
+    }else{
+        write(addrAbs, temp & 0x00ff);
+    }
     return 0;
 }
 
@@ -1035,23 +1078,26 @@ uint8_t PZ6502::TYA(){
     return 0;
 }
 
+// this function captures illegal opcodes
 uint8_t PZ6502::XXX(){
     return 0;
 }
 
 
 void PZ6502::reset(){
-    accum = 0x00;
-    x_reg = 0x00;
-    x_reg = 0x00;
-    stkp = 0xff;
-    status = 0x00;
+
 
     addrAbs = 0xfffc; // go to reset instruction in memory
     uint16_t lo = read(addrAbs + 0);
     uint16_t hi = read(addrAbs + 1);
 
     pc = (hi << 8) | lo;
+
+    accum = 0x00;
+    x_reg = 0x00;
+    x_reg = 0x00;
+    stkp = 0xff;
+    status = 0x00;
 
     addrAbs = 0x0000;
     addrRel = 0x0000;
@@ -1114,9 +1160,6 @@ void PZ6502::nmi(){
 
     cycles = 7;
 }
-
-
-
 
 bool PZ6502::complete(){
     return cycles == 0;

@@ -185,7 +185,7 @@ public:
 			NOP
 			NOP
 		*/
-		
+
 		// Convert hex string into bytes for RAM
 		std::stringstream ss;
 		ss << "A2 0A 8E 00 00 A2 03 8E 01 00 AC 00 00 A9 00 18 6D 01 00 88 D0 FA 8D 02 00 EA EA EA";
@@ -202,7 +202,7 @@ public:
 		nes.ram[0xFFFD] = 0x80;
 
 		// Dont forget to set IRQ and NMI vectors if you want to play with those
-				
+
 		// Extract dissassembly
 		mapAsm = nes.cpu.disassemble(0x0000, 0xFFFF);
 
@@ -221,7 +221,7 @@ public:
 			do
 			{
 				nes.cpu.clock();
-			} 
+			}
 			while (!nes.cpu.complete());
 		}
 
@@ -234,7 +234,7 @@ public:
 		if (GetKey(olc::Key::N).bPressed)
 			nes.cpu.nmi();
 
-		// Draw Ram Page 0x00		
+		// Draw Ram Page 0x00
 		DrawRam(2, 2, 0x0000, 16, 16);
 		DrawRam(2, 182, 0x8000, 16, 16);
 		DrawCpu(448, 2);
